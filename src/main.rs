@@ -29,13 +29,19 @@ fn sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8
             let val7 = input.get_pixel(x, y).0[0] as i32; // [x, y+1]
             let val8 = input.get_pixel(x+1, y+1).0[0] as i32; // [x+1, y+1]
             
-            let gx = (1 * val0) + (-1 * val2) + (2 * val3) + (-2 * val5) + (1 * val6) + (-1 * val8);
-            let gy = (1 * val0) + (2 * val1) + (1 * val2) + (-1 * val6) + (-2 * val7) + (-1 * val8);
-            // let g = ((gx.pow(2) + gy.pow(2)) as f64).sqrt();
+            let gx = val0 + (-1 * val2)
+                + (2 * val3) + (-2 * val5)
+                + (1 * val6) + (-1 * val8);
+            
+            let gx : i32 = val0 + (val3 * 2) + val6
+                - (val2 + (val5 * 2) + val8);
+            let gy : i32 = val0 + (2 * val2) + val1
+                - (val6 + (2 * val7) + val8);
+
             let g = ((gx as f64).powi(2) + (gy as f64).powi(2)).sqrt();
             buffer.put_pixel(x, y, Luma([g as u8]));
         }
     }
 
-    buffer // return the buffer
+    buffer
 }

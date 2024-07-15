@@ -1,26 +1,22 @@
 
-use std::cell;
-
+use std::fs;
 use image::{ImageBuffer, Luma};
 // use Str
 // use image
 fn main() {
-    std::env::set_var("RUST_BACKTRACE", "full");
-    // println!("Hello, world!");
     let img = image::open("src/fun.jpg").expect("image not found.");
-    // let img: DynamicImage = image::open("src/fun.jpg").expect("Failed to open image.");
-    
     let img_gray = img.to_luma8();
-    let hogs = hogs(img_gray);
-
-    // let sobel_img = sobel(img_gray);
-    // let hogs_img = hogs(img_gray);
-    // sobel_img.save("src/output.png").expect("Failed to save image.");
+    let hogs = hogs(&img_gray);
+    let strings: Vec<String> = hogs.iter()
+    .map(|x| x.iter().map(|y| y.to_string()).collect::<Vec<String>>().join(","))
+    .collect();
+    let strings = strings.join("\n");
+    fs::write("src/hogs.txt", strings).expect("Unable to write file");
 }
 
-fn sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8>>{
-    let height = input.height() - 2;
-    let width = input.width() - 2;
+fn _sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8>>{
+    let height = input.height();
+    let width = input.width();
     let mut buffer : ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(width, height);
 
     for y in 1..height-1 {
@@ -29,7 +25,6 @@ fn sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8
             let val1 = input.get_pixel(x, y-1).0[0] as i32; // [x, y-1]
             let val2 = input.get_pixel(x+1, y-1).0[0] as i32; // [x+1, y-1]
             let val3 = input.get_pixel(x-1, y).0[0] as i32; // [x-1, y]
-            let _val4 = input.get_pixel(x, y).0[0] as i32; // [x, y]
             let val5 = input.get_pixel(x+1, y).0[0] as i32; // [x+1, y]
             let val6 = input.get_pixel(x-1, y-1).0[0] as i32; // [x-1, y+1]
             let val7 = input.get_pixel(x, y).0[0] as i32; // [x, y+1]
@@ -37,7 +32,7 @@ fn sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8
             
             let gx : i32 = val0 + (val3 * 2) + val6
                 - (val2 + (val5 * 2) + val8);
-            let gy : i32 = val0 + (2 * val2) + val1
+            let gy : i32 = val0 + (2 * val1) + val2
                 - (val6 + (2 * val7) + val8);
 
             let g = ((gx as f64).powi(2) + (gy as f64).powi(2)).sqrt();
@@ -49,31 +44,41 @@ fn sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8
 }
 
 
-fn hogs(input : ImageBuffer<Luma<u8>, Vec<u8>>) {
+fn hogs(input : &ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<Vec<f64>> {
     // let input = input
     let (width, height) = input.dimensions();
-    let hists = hogs_calc_hists(input.clone());
+    let hists = hogs_calc_hists(input);
 
     let blocks_x = (width / 8) as usize;
     let blocks_y = (height / 8) as usize;
 
+    let mut features = vec![vec![0.0; 36]; blocks_x * blocks_y];
+
     for y in 0.. blocks_y-1 {
         for x in 0..blocks_x-1 {
-            let feature_vec = [0.0; 36];
-            // feature_vec += hists[y * blocks_x + x];
-            // feature_vec += hists[y * blocks_x + x + 1];
-            // feature_vec += hists[(y+1) * blocks_x + x];
-            // feature_vec += hists[(y+1) * blocks_x + x + 1];
+            let mut feature_vec = [0.0; 36];
+            let indices = [
+                (y * blocks_x + x),
+                (y * blocks_x + x + 1),
+                ((y+1) * blocks_x + x),
+                ((y+1) * blocks_x + x + 1)];
+            
+            for i in 0.. 4 {
+                feature_vec[(i * 9) .. (i * 9 + 9)].copy_from_slice(&hists[indices[i]]);
+            }
+            
+            let norm = feature_vec.iter().map(|x| x.powi(2)).sum::<f64>().sqrt();
+            feature_vec.iter_mut().for_each(|x| *x /= norm + 0.00001);
+            features[y * blocks_x + x] = feature_vec.to_vec();
         }
     }
-    
+    features
 }
 
-fn hogs_calc_hists(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[f64; 9]>{
+fn hogs_calc_hists(input : &ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[f64; 9]>{
     // thank you https://builtin.com/articles/histogram-of-oriented-gradients
     let height = input.height();
     let width = input.width();
-    // let mut buffer : ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(width, height);
     let mut gy_buffer : ImageBuffer<Luma<i16>, Vec<i16>> = ImageBuffer::new(width, height);
     let mut gx_buffer : ImageBuffer<Luma<i16>, Vec<i16>> = ImageBuffer::new(width, height);
     
@@ -102,9 +107,9 @@ fn hogs_calc_hists(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[f64; 9]>{
 
     // calculate the normalised histogram values of each cell of the image 
     // let mut normed_hists : Vec<[f64; 9]> = Vec::new();
-    let mut hists : Vec<[f64; 9]> = Vec::new();
     let cells_y = ((height-1) / 8) as usize;
     let cells_x = ((width-1) / 8) as usize;
+    let mut hists : Vec<[f64; 9]> = vec![[0.0; 9]; cells_x * cells_y];
     for y in 0..  cells_y {
         for x in 0.. cells_x {
 
@@ -118,7 +123,7 @@ fn hogs_calc_hists(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[f64; 9]>{
                     let bin = (angle / 20.0).floor() as usize;
                     
                     let share = angle % 20.0 / 20.0;
-                    hist[bin] += (1.0 - share) * magnitude;
+                    hist[bin%9] += (1.0 - share) * magnitude;
                     hist[(bin+1) % 9] += share * magnitude;
 
                 }
@@ -126,6 +131,5 @@ fn hogs_calc_hists(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[f64; 9]>{
             hists[y * cells_x + x] = hist;
         }
     }
-
     hists
 }

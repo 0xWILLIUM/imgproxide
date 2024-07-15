@@ -1,4 +1,6 @@
 
+use std::cell;
+
 use image::{ImageBuffer, Luma};
 // use Str
 // use image
@@ -9,9 +11,11 @@ fn main() {
     // let img: DynamicImage = image::open("src/fun.jpg").expect("Failed to open image.");
     
     let img_gray = img.to_luma8();
-    let sobel_img = sobel(img_gray);
+    let hogs = hogs(img_gray);
+
+    // let sobel_img = sobel(img_gray);
     // let hogs_img = hogs(img_gray);
-    sobel_img.save("src/output.png").expect("Failed to save image.");
+    // sobel_img.save("src/output.png").expect("Failed to save image.");
 }
 
 fn sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8>>{
@@ -46,8 +50,22 @@ fn sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8
 
 
 fn hogs(input : ImageBuffer<Luma<u8>, Vec<u8>>) {
-    let hists = hogs_calc_hists(input);
+    // let input = input
+    let (width, height) = input.dimensions();
+    let hists = hogs_calc_hists(input.clone());
 
+    let blocks_x = (width / 8) as usize;
+    let blocks_y = (height / 8) as usize;
+
+    for y in 0.. blocks_y-1 {
+        for x in 0..blocks_x-1 {
+            let feature_vec = [0.0; 36];
+            // feature_vec += hists[y * blocks_x + x];
+            // feature_vec += hists[y * blocks_x + x + 1];
+            // feature_vec += hists[(y+1) * blocks_x + x];
+            // feature_vec += hists[(y+1) * blocks_x + x + 1];
+        }
+    }
     
 }
 
@@ -61,13 +79,13 @@ fn hogs_calc_hists(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[f64; 9]>{
     
     for y in 1..height-1 {
         for x in 1..width-1 {
-            let val0 = input.get_pixel(x-1, y).0[0] as i32; // [x-1, y]
-            let val2 = input.get_pixel(x+1, y).0[0] as i32; // [x+1, y]
-            gx_buffer.put_pixel(x, y, Luma([(-val0 + val2) as i16]));
+            let val0 = input.get_pixel(x-1, y).0[0] as i16; // [x-1, y]
+            let val2 = input.get_pixel(x+1, y).0[0] as i16; // [x+1, y]
+            gx_buffer.put_pixel(x, y, Luma([-val0 + val2]));
             
-            let val0 = input.get_pixel(x, y-1).0[0] as i32; // [x-1, y]
-            let val2 = input.get_pixel(x, y+1).0[0] as i32; // [x+1, y]
-            gy_buffer.put_pixel(x, y, Luma([(-val0 + val2) as i16]));
+            let val0 = input.get_pixel(x, y-1).0[0] as i16; // [x-1, y]
+            let val2 = input.get_pixel(x, y+1).0[0] as i16; // [x+1, y]
+            gy_buffer.put_pixel(x, y, Luma([-val0 + val2]));
 
         }
     }
@@ -83,16 +101,18 @@ fn hogs_calc_hists(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[f64; 9]>{
     }
 
     // calculate the normalised histogram values of each cell of the image 
-    let mut normed_hists : Vec<[f64; 9]> = Vec::new();
-    
-    for y in 0.. (height-1) / 8 {
-        for x in 0.. (width-1) / 8 {
+    // let mut normed_hists : Vec<[f64; 9]> = Vec::new();
+    let mut hists : Vec<[f64; 9]> = Vec::new();
+    let cells_y = ((height-1) / 8) as usize;
+    let cells_x = ((width-1) / 8) as usize;
+    for y in 0..  cells_y {
+        for x in 0.. cells_x {
 
             let mut hist : [f64; 9] = [0.0; 9];
             // can this be done through the use of a zip with mag + dir?
             for i in 0..8 {
                 for j in 0..8 {
-                    let index = (((y * 8 + i) * width) + (x * 8) + j) as usize;
+                    let index = ((y * 8 + i) * width as usize + (x * 8) + j) as usize;
                     let magnitude = mags[index];
                     let angle = angles[index];
                     let bin = (angle / 20.0).floor() as usize;
@@ -103,18 +123,9 @@ fn hogs_calc_hists(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[f64; 9]>{
 
                 }
             }
-
-            let sum : f64 = hist.iter().sum();
-            if sum > 0.0 {
-                // normalise!
-                for val in hist.iter_mut() {
-                    *val /= sum;
-                }
-            }
-
-            normed_hists[(y * (width / 8) + x) as usize] = hist;
+            hists[y * cells_x + x] = hist;
         }
     }
 
-    normed_hists
+    hists
 }

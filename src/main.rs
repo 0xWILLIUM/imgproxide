@@ -1,15 +1,17 @@
 
 use image::{ImageBuffer, Luma};
-
 // use Str
 // use image
 fn main() {
-    // env::set_var("RUST_BACKTRACE", "full");
+    std::env::set_var("RUST_BACKTRACE", "full");
     // println!("Hello, world!");
     let img = image::open("src/fun.jpg").expect("image not found.");
+    // let img: DynamicImage = image::open("src/fun.jpg").expect("Failed to open image.");
+    
     let img_gray = img.to_luma8();
-    let sobel_img = sobel(img_gray);
-    sobel_img.save("src/output.png").expect("Failed to save image.");
+    // let sobel_img = sobel(img_gray);
+    let hogs_img = hogs(img_gray);
+    hogs_img.save("src/output.png").expect("Failed to save image.");
 }
 
 fn sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8>>{
@@ -29,10 +31,6 @@ fn sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8
             let val7 = input.get_pixel(x, y).0[0] as i32; // [x, y+1]
             let val8 = input.get_pixel(x+1, y+1).0[0] as i32; // [x+1, y+1]
             
-            let gx = val0 + (-1 * val2)
-                + (2 * val3) + (-2 * val5)
-                + (1 * val6) + (-1 * val8);
-            
             let gx : i32 = val0 + (val3 * 2) + val6
                 - (val2 + (val5 * 2) + val8);
             let gy : i32 = val0 + (2 * val2) + val1
@@ -44,4 +42,31 @@ fn sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8
     }
 
     buffer
+}
+
+fn hogs(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8>>{
+    let height = input.height();
+    let width = input.width();
+    // let mut buffer : ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+    let mut gy_buffer : ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+    let mut gx_buffer : ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+    for y in 1..height-1 {
+        for x in 1..width-1 {
+            let val0 = input.get_pixel(x-1, y).0[0] as i32; // [x-1, y]
+            let val2 = input.get_pixel(x+1, y).0[0] as i32; // [x+1, y]
+            gx_buffer.put_pixel(x, y, Luma([(-val0 + val2) as u8]));
+            
+            let val0 = input.get_pixel(x, y-1).0[0] as i32; // [x-1, y]
+            let val2 = input.get_pixel(x, y+1).0[0] as i32; // [x+1, y]
+            gy_buffer.put_pixel(x, y, Luma([(-val0 + val2) as u8]));
+
+        }
+    }
+    
+    let g_mags : Vec<u8> = gx_buffer.iter().zip(gy_buffer.iter())
+    .map(|(gx, gy)| (((*gx as i32).pow(2) + (*gy as i32).pow(2)) as f64).sqrt() as u8) // could i x -> f64.. perform ops.. --> u8
+    .collect();
+    let gxy_buffer : ImageBuffer<Luma<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, g_mags).expect("Failed to create image buffer.");
+
+    gxy_buffer
 }

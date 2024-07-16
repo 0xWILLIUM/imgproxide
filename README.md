@@ -8,3 +8,9 @@ this is a repository where I am implementing a few image processing functions in
 
 - sobel filter
 - hog (histogram of oriented gradients)
+- ui
+
+### goal feature
+
+- knn ml model
+- data set integration

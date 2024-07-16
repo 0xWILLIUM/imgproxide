@@ -1,6 +1,9 @@
 
 use std::fs;
 use image::{ImageBuffer, Luma};
+use linfa_svm::Svm;
+use linfa::dataset::Dataset;
+
 // use Str
 // use image
 fn main() {
@@ -12,6 +15,10 @@ fn main() {
     .collect();
     let strings = strings.join("\n");
     fs::write("src/hogs.txt", strings).expect("Unable to write file");
+
+    let files = fs::read_dir("C:\\Users\\sterb\\Downloads\\archive.zip\\images\\Images\\n02085620-Chihuahua")
+    .unwrap();
+
 }
 
 fn _sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u8>>{

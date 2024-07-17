@@ -1,23 +1,46 @@
 
 use std::fs;
 use image::{ImageBuffer, Luma};
-use linfa_svm::Svm;
 use linfa::dataset::Dataset;
+use ndarray::{Array1, Array2};
 
 // use Str
 // use image
 fn main() {
-    let img = image::open("src/fun.jpg").expect("image not found.");
-    let img_gray = img.to_luma8();
-    let hogs = hogs(&img_gray);
-    let strings: Vec<String> = hogs.iter()
-    .map(|x| x.iter().map(|y| y.to_string()).collect::<Vec<String>>().join(","))
-    .collect();
-    let strings = strings.join("\n");
-    fs::write("src/hogs.txt", strings).expect("Unable to write file");
+    // let img = image::open("src/fun.jpg").expect("image not found.");
+    // let img_gray = img.to_luma8();
+    // let hogs = hogs(&img_gray);
+    // let strings: Vec<String> = hogs.iter()
+    // .map(|x| x.iter().map(|y| y.to_string()).collect::<Vec<String>>().join(","))
+    // .collect();
+    // let strings = strings.join("\n");
+    // fs::write("src/hogs.txt", strings).expect("Unable to write file");
 
-    let files = fs::read_dir("C:\\Users\\sterb\\Downloads\\archive.zip\\images\\Images\\n02085620-Chihuahua")
-    .unwrap();
+    let mut features = Vec::new();
+    // let mut labels = Vec::new();
+    let img_path = "src/chow/";
+    let files = fs::read_dir(img_path)
+        .unwrap();
+    // let labelss = fs::read_dir(lbl_path)
+    //     .unwrap();
+    let mut labels = Vec::new();
+    for file in files {
+        println!("{:?}", file);
+        let file = file.unwrap();
+        let path = file.path();
+        let img = image::open(path).expect("image not found.");
+        let img_gray = img.to_luma8();
+        let hog_features = hogs(&img_gray);
+        features.push(hog_features);
+        labels.push(1);
+    }
+
+    let n_samples = features.len();
+    let n_features = features[0].len();
+    let features : Array2<Vec<f64>> = Array2::from_shape_vec((n_samples, n_features), features.into_iter().flatten().collect()).unwrap();
+    // let no_labels = labels.count();
+    let labels = Array1::from(labels);
+    let dataset = Dataset::new(features, labels);
 
 }
 
@@ -70,10 +93,14 @@ fn hogs(input : &ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<Vec<f64>> {
                 ((y+1) * blocks_x + x),
                 ((y+1) * blocks_x + x + 1)];
             
-            for i in 0.. 4 {
-                feature_vec[(i * 9) .. (i * 9 + 9)].copy_from_slice(&hists[indices[i]]);
+            for i in 0..4 {
+                // println!("{:?}", indices[i]);
+                let vals = &hists[indices[i]];
+                for (j, &val) in vals.iter().enumerate() {
+                    feature_vec[i * 9 + j] = val;
+                }
             }
-            
+
             let norm = feature_vec.iter().map(|x| x.powi(2)).sum::<f64>().sqrt();
             feature_vec.iter_mut().for_each(|x| *x /= norm + 0.00001);
             features[y * blocks_x + x] = feature_vec.to_vec();

@@ -1,5 +1,5 @@
 
-use std::fs;
+use std::{env, fs};
 use image::{ImageBuffer, Luma};
 use linfa::dataset::Dataset;
 use ndarray::{Array1, Array2};
@@ -7,15 +7,7 @@ use ndarray::{Array1, Array2};
 // use Str
 // use image
 fn main() {
-    // let img = image::open("src/fun.jpg").expect("image not found.");
-    // let img_gray = img.to_luma8();
-    // let hogs = hogs(&img_gray);
-    // let strings: Vec<String> = hogs.iter()
-    // .map(|x| x.iter().map(|y| y.to_string()).collect::<Vec<String>>().join(","))
-    // .collect();
-    // let strings = strings.join("\n");
-    // fs::write("src/hogs.txt", strings).expect("Unable to write file");
-
+    env::set_var("RUST_BACKTRACE", "1");
     let mut features = Vec::new();
     // let mut labels = Vec::new();
     let img_path = "src/chow/";
@@ -38,9 +30,8 @@ fn main() {
     let n_samples = features.len();
     let n_features = features[0].len();
     let features : Array2<Vec<f64>> = Array2::from_shape_vec((n_samples, n_features), features.into_iter().flatten().collect()).unwrap();
-    // let no_labels = labels.count();
     let labels = Array1::from(labels);
-    let dataset = Dataset::new(features, labels);
+    let _dataset = Dataset::new(features, labels);
 
 }
 
@@ -75,13 +66,7 @@ fn _sobel(input : ImageBuffer<Luma<u8>, Vec<u8>>) -> ImageBuffer<Luma<u8>, Vec<u
 
 
 fn hogs(input : &ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<Vec<f64>> {
-    // let input = input
-    let (width, height) = input.dimensions();
-    let hists = hogs_calc_hists(input);
-
-    let blocks_x = (width / 8) as usize;
-    let blocks_y = (height / 8) as usize;
-
+    let (hists, blocks_x, blocks_y) = hogs_calc_hists(input);
     let mut features = vec![vec![0.0; 36]; blocks_x * blocks_y];
 
     for y in 0.. blocks_y-1 {
@@ -94,7 +79,6 @@ fn hogs(input : &ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<Vec<f64>> {
                 ((y+1) * blocks_x + x + 1)];
             
             for i in 0..4 {
-                // println!("{:?}", indices[i]);
                 let vals = &hists[indices[i]];
                 for (j, &val) in vals.iter().enumerate() {
                     feature_vec[i * 9 + j] = val;
@@ -109,7 +93,7 @@ fn hogs(input : &ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<Vec<f64>> {
     features
 }
 
-fn hogs_calc_hists(input : &ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[f64; 9]>{
+fn hogs_calc_hists(input : &ImageBuffer<Luma<u8>, Vec<u8>>) -> (Vec<[f64; 9]>, usize, usize) {
     // thank you https://builtin.com/articles/histogram-of-oriented-gradients
     let height = input.height();
     let width = input.width();
@@ -165,5 +149,5 @@ fn hogs_calc_hists(input : &ImageBuffer<Luma<u8>, Vec<u8>>) -> Vec<[f64; 9]>{
             hists[y * cells_x + x] = hist;
         }
     }
-    hists
+    (hists, cells_x, cells_y)
 }
